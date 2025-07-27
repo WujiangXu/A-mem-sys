@@ -40,11 +40,12 @@ For more details, please refer to our paper: [A-MEM: Agentic Memory for LLM Agen
 ## How It Works 🛠️
 
 When a new memory is added to the system:
-1. Generates comprehensive notes with structured attributes
-2. Creates contextual descriptions and tags
-3. Analyzes historical memories for relevant connections
-4. Establishes meaningful links based on similarities
-5. Enables dynamic memory evolution and updates
+1. **LLM Analysis**: Automatically analyzes content to generate keywords, context, and tags (if not provided)
+2. **Enhanced Embedding**: Creates vector embeddings using both content and generated metadata for superior retrieval
+3. **Semantic Storage**: Stores memories in ChromaDB with rich semantic information
+4. **Relationship Analysis**: Analyzes historical memories for relevant connections using enhanced embeddings
+5. **Dynamic Linking**: Establishes meaningful links based on content and metadata similarities
+6. **Memory Evolution**: Enables continuous memory evolution and updates through intelligent analysis
 
 ## Results 📊
 
@@ -88,92 +89,130 @@ memory_system = AgenticMemorySystem(
     llm_model="gpt-4o-mini"         # LLM model name
 )
 
-# Add Memories ➕
-# Simple addition
-memory_id = memory_system.add_note("Deep learning neural networks")
+# Add Memories with Automatic LLM Analysis ✨
+# Simple addition - LLM automatically generates keywords, context, and tags
+memory_id1 = memory_system.add_note(
+    "Machine learning algorithms use neural networks to process complex datasets and identify patterns."
+)
 
-# Addition with metadata
-memory_id = memory_system.add_note(
-    content="Machine learning project notes",
-    tags=["ml", "project"],
-    category="Research",
+# Check the automatically generated metadata
+memory = memory_system.read(memory_id1)
+print(f"Content: {memory.content}")
+print(f"Auto-generated Keywords: {memory.keywords}")  # e.g., ['machine learning', 'neural networks', 'datasets']
+print(f"Auto-generated Context: {memory.context}")    # e.g., "Discussion about ML algorithms and data processing"
+print(f"Auto-generated Tags: {memory.tags}")          # e.g., ['artificial intelligence', 'data science', 'technology']
+
+# Partial metadata provision - LLM fills in missing attributes
+memory_id2 = memory_system.add_note(
+    content="Python is excellent for data science applications",
+    keywords=["Python", "programming"]  # Provide keywords, LLM will generate context and tags
+)
+
+# Manual metadata provision - no LLM analysis needed
+memory_id3 = memory_system.add_note(
+    content="Project meeting notes for Q1 review",
+    keywords=["meeting", "project", "review"],
+    context="Business project management discussion",
+    tags=["business", "project", "meeting"],
     timestamp="202503021500"  # YYYYMMDDHHmm format
 )
 
-# Read (Retrieve) Memories 📖
-# Get memory by ID
-memory = memory_system.read(memory_id)
-print(f"Content: {memory.content}")
-print(f"Tags: {memory.tags}")
-print(f"Context: {memory.context}")
-print(f"Keywords: {memory.keywords}")
-
-# Search memories
-results = memory_system.search_agentic("neural networks", k=5)
+# Enhanced Retrieval with Metadata 🔍
+# The system now uses generated metadata for better semantic search
+results = memory_system.search("artificial intelligence data processing", k=3)
 for result in results:
     print(f"ID: {result['id']}")
     print(f"Content: {result['content']}")
+    print(f"Keywords: {result['keywords']}")
+    print(f"Tags: {result['tags']}")
+    print(f"Relevance Score: {result.get('score', 'N/A')}")
+    print("---")
+
+# Alternative search methods
+results = memory_system.search_agentic("neural networks", k=5)
+for result in results:
+    print(f"ID: {result['id']}")
+    print(f"Content: {result['content'][:100]}...")
     print(f"Tags: {result['tags']}")
     print("---")
 
 # Update Memories 🔄
-memory_system.update(memory_id, content="Updated content about deep learning")
+memory_system.update(memory_id1, content="Updated: Deep learning neural networks for pattern recognition")
 
 # Delete Memories ❌
-memory_system.delete(memory_id)
+memory_system.delete(memory_id3)
 
 # Memory Evolution 🧬
 # The system automatically evolves memories by:
-# 1. Finding semantic relationships using ChromaDB
-# 2. Updating metadata and context
-# 3. Creating connections between related memories
+# 1. Using LLM to analyze content and generate semantic metadata
+# 2. Finding relationships using enhanced ChromaDB embeddings (content + metadata)
+# 3. Updating tags, context, and connections based on related memories
+# 4. Creating semantic links between memories
 # This happens automatically when adding or updating memories!
 ```
 
 ### Advanced Features 🌟
 
-1. **ChromaDB Vector Storage** 📦
-   - Efficient vector embedding storage and retrieval
-   - Fast semantic similarity search
-   - Automatic metadata handling
-   - Persistent memory storage
+1. **Intelligent LLM Analysis** 🧠
+   - Automatic keyword extraction from content
+   - Context generation based on semantic understanding
+   - Smart tag assignment for categorization
+   - Seamless integration with OpenAI and Ollama backends
 
-2. **Memory Evolution** 🧬
-   - Automatically analyzes content relationships
+2. **Enhanced ChromaDB Vector Storage** 📦
+   - Embedding generation using content + metadata for superior semantic search
+   - Fast similarity search leveraging both content and generated attributes
+   - Automatic metadata serialization and handling
+   - Persistent memory storage with rich semantic information
+
+3. **Memory Evolution** 🧬
+   - Automatically analyzes content relationships using LLM-generated metadata
    - Updates tags and context based on related memories
    - Creates semantic connections between memories
+   - Dynamic memory organization with improved accuracy
 
-3. **Flexible Metadata** 📋
-   - Custom tags and categories
-   - Automatic keyword extraction
-   - Context generation
-   - Timestamp tracking
+4. **Flexible Metadata Management** 📋
+   - Auto-generation when not provided (keywords, context, tags)
+   - Manual override support for custom metadata
+   - Partial metadata completion (LLM fills missing attributes)
+   - Timestamp tracking and retrieval count monitoring
 
-4. **Multiple LLM Backends** 🤖
-   - OpenAI (GPT-4, GPT-3.5)
+5. **Multiple LLM Backends** 🤖
+   - OpenAI (GPT-4, GPT-4o-mini, GPT-3.5)
    - Ollama (for local deployment)
+   - Configurable model selection for analysis and evolution
 
 ### Best Practices 💪
 
 1. **Memory Creation** ✨:
-   - Provide clear, specific content
-   - Add relevant tags for better organization
-   - Let the system handle context and keyword generation
+   - Provide clear, descriptive content for better LLM analysis
+   - Let the system auto-generate metadata for optimal semantic richness
+   - Use partial metadata provision when you want to control specific attributes
+   - Provide manual metadata only when you need precise control
 
 2. **Memory Retrieval** 🔍:
-   - Use specific search queries
-   - Adjust 'k' parameter based on needed results
-   - Consider both exact and semantic matches
+   - Leverage semantic search with natural language queries
+   - Use specific domain terminology that matches generated keywords
+   - Adjust 'k' parameter based on needed results (typically 3-10)
+   - Take advantage of enhanced retrieval using both content and metadata
 
 3. **Memory Evolution** 🧬:
-   - Allow automatic evolution to organize memories
-   - Review generated connections periodically
-   - Use consistent tagging conventions
+   - Allow automatic evolution to maximize memory organization
+   - Review LLM-generated metadata periodically for accuracy
+   - Use consistent domain-specific terminology for better clustering
+   - Monitor memory connections to understand knowledge relationships
 
-4. **Error Handling** ⚠️:
-   - Always check return values
+4. **LLM Integration** 🤖:
+   - Ensure API keys are properly configured for your chosen backend
+   - Use gpt-4o-mini for cost-effective analysis or gpt-4 for higher quality
+   - Consider Ollama for local deployment and privacy requirements
+   - Monitor LLM usage for cost management
+
+5. **Error Handling** ⚠️:
+   - Always check return values and handle None responses
    - Handle potential KeyError for non-existent memories
-   - Use try-except blocks for LLM operations
+   - Use try-except blocks for LLM operations (network/API failures)
+   - Implement fallback behavior when LLM analysis fails
 
 ## Citation 📚
 

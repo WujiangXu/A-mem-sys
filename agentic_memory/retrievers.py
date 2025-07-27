@@ -28,13 +28,32 @@ class ChromaRetriever:
         self.collection = self.client.get_or_create_collection(name=collection_name,embedding_function=self.embedding_function)
         
     def add_document(self, document: str, metadata: Dict, doc_id: str):
-        """Add a document to ChromaDB.
+        """Add a document to ChromaDB with enhanced embedding using metadata.
         
         Args:
             document: Text content to add
-            metadata: Dictionary of metadata
+            metadata: Dictionary of metadata including keywords, tags, context
             doc_id: Unique identifier for the document
         """
+        # Build enhanced document content including semantic metadata
+        enhanced_document = document
+        
+        # Add context information
+        if 'context' in metadata and metadata['context'] != "General":
+            enhanced_document += f" context: {metadata['context']}"
+        
+        # Add keywords information    
+        if 'keywords' in metadata and metadata['keywords']:
+            keywords = metadata['keywords'] if isinstance(metadata['keywords'], list) else json.loads(metadata['keywords'])
+            if keywords:
+                enhanced_document += f" keywords: {', '.join(keywords)}"
+        
+        # Add tags information
+        if 'tags' in metadata and metadata['tags']:
+            tags = metadata['tags'] if isinstance(metadata['tags'], list) else json.loads(metadata['tags'])
+            if tags:
+                enhanced_document += f" tags: {', '.join(tags)}"
+        
         # Convert MemoryNote object to serializable format
         processed_metadata = {}
         for key, value in metadata.items():
@@ -44,9 +63,13 @@ class ChromaRetriever:
                 processed_metadata[key] = json.dumps(value)
             else:
                 processed_metadata[key] = str(value)
+        
+        # Store enhanced document content for better embedding
+        processed_metadata['enhanced_content'] = enhanced_document
                 
+        # Use enhanced document content for embedding generation
         self.collection.add(
-            documents=[document],
+            documents=[enhanced_document],
             metadatas=[processed_metadata],
             ids=[doc_id]
         )
