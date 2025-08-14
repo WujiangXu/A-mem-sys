@@ -95,7 +95,8 @@ class AgenticMemorySystem:
                  llm_backend: str = "openai",
                  llm_model: str = "gpt-4o-mini",
                  evo_threshold: int = 100,
-                 api_key: Optional[str] = None):  
+                 api_key: Optional[str] = None,
+                 embedding_backend: str = "sentence-transformers"):
         """Initialize the memory system.
         
         Args:
@@ -104,19 +105,21 @@ class AgenticMemorySystem:
             llm_model: Name of the LLM model
             evo_threshold: Number of memories before triggering evolution
             api_key: API key for the LLM service
+            embedding_backend: Embedding backend ('ollama', 'sentence-transformers')
         """
         self.memories = {}
         self.model_name = model_name
+        self.embedding_backend = embedding_backend
         # Initialize ChromaDB retriever with empty collection
         try:
             # First try to reset the collection if it exists
-            temp_retriever = ChromaRetriever(collection_name="memories",model_name=self.model_name)
+            temp_retriever = ChromaRetriever(collection_name="memories", model_name=self.model_name, embedding_backend=self.embedding_backend)
             temp_retriever.client.reset()
         except Exception as e:
             logger.warning(f"Could not reset ChromaDB collection: {e}")
             
         # Create a fresh retriever instance
-        self.retriever = ChromaRetriever(collection_name="memories",model_name=self.model_name)
+        self.retriever = ChromaRetriever(collection_name="memories",model_name=self.model_name, embedding_backend=self.embedding_backend)
         
         # Initialize LLM controller
         self.llm_controller = LLMController(llm_backend, llm_model, api_key)
@@ -288,7 +291,7 @@ class AgenticMemorySystem:
     def consolidate_memories(self):
         """Consolidate memories: update retriever with new documents"""
         # Reset ChromaDB collection
-        self.retriever = ChromaRetriever(collection_name="memories",model_name=self.model_name)
+        self.retriever = ChromaRetriever(collection_name="memories", model_name=self.model_name, embedding_backend=self.embedding_backend)
         
         # Re-add all memory documents with their complete metadata
         for memory in self.memories.values():
