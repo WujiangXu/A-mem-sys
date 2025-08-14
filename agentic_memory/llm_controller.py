@@ -71,6 +71,7 @@ class OllamaController(BaseLLMController):
     def get_completion(self, prompt: str, response_format: dict, temperature: float = 0.7) -> str:
         try:
             response = completion(
+                api_base=os.getenv("OLLAMA_BASE_URL"),
                 model="ollama_chat/{}".format(self.model),
                 messages=[
                     {"role": "system", "content": "You must respond with a JSON object."},
