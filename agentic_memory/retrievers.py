@@ -10,22 +10,42 @@ import pickle
 from nltk.tokenize import word_tokenize
 import os
 import json
-from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction, OllamaEmbeddingFunction
+import os
 
 def simple_tokenize(text):
     return word_tokenize(text)
 
 class ChromaRetriever:
     """Vector database retrieval using ChromaDB"""
-    def __init__(self, collection_name: str = "memories",model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, collection_name: str = "memories", model_name: str = "all-MiniLM-L6-v2", embedding_backend: str = "ollama"):
         """Initialize ChromaDB retriever.
         
         Args:
             collection_name: Name of the ChromaDB collection
+            model_name: Embedding model name
+            embedding_backend: 'ollama' for Ollama, 'sentence-transformers' for local models
         """
-        self.client = chromadb.Client(Settings(allow_reset=True))
-        self.embedding_function = SentenceTransformerEmbeddingFunction(model_name=model_name)
-        self.collection = self.client.get_or_create_collection(name=collection_name,embedding_function=self.embedding_function)
+        self.client = chromadb.HttpClient(host=os.getenv("CHROMADB_HOST"), port=os.getenv("CHROMADB_PORT"), settings=Settings(allow_reset=True))
+
+        # Choose embedding backend
+        if embedding_backend == "ollama":
+            print(f"Using Ollama embedding with model: {model_name}")
+            try:
+                self.embedding_function = OllamaEmbeddingFunction(
+                    model_name=model_name,
+                    url=os.getenv("OLLAMA_BASE_URL")
+                )
+            except Exception as e:
+                print(f"Warning: Could not initialize Ollama embedding function: {e}")
+                print("Falling back to sentence-transformers...")
+                embedding_backend = "sentence-transformers"
+
+        if embedding_backend == "sentence-transformers":
+            print(f"Using sentence-transformers with model: {model_name}")
+            self.embedding_function = SentenceTransformerEmbeddingFunction(model_name=model_name)
+
+        self.collection = self.client.get_or_create_collection(name=collection_name, embedding_function=self.embedding_function)
         
     def add_document(self, document: str, metadata: Dict, doc_id: str):
         """Add a document to ChromaDB with enhanced embedding using metadata.
