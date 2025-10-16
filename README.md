@@ -85,7 +85,7 @@ from agentic_memory.memory_system import AgenticMemorySystem
 # Initialize the memory system 🚀
 memory_system = AgenticMemorySystem(
     model_name='all-MiniLM-L6-v2',  # Embedding model for ChromaDB
-    llm_backend="openai",           # LLM backend (openai/ollama)
+    llm_backend="openai",           # LLM backend (openai/ollama/openrouter)
     llm_model="gpt-4o-mini"         # LLM model name
 )
 
@@ -157,7 +157,7 @@ memory_system.delete(memory_id3)
    - Automatic keyword extraction from content
    - Context generation based on semantic understanding
    - Smart tag assignment for categorization
-   - Seamless integration with OpenAI and Ollama backends
+   - Seamless integration with OpenAI, Ollama, and OpenRouter backends
 
 2. **Enhanced ChromaDB Vector Storage** 📦
    - Embedding generation using content + metadata for superior semantic search
@@ -180,6 +180,7 @@ memory_system.delete(memory_id3)
 5. **Multiple LLM Backends** 🤖
    - OpenAI (GPT-4, GPT-4o-mini, GPT-3.5)
    - Ollama (for local deployment)
+   - OpenRouter (access to 100+ models from multiple providers)
    - Configurable model selection for analysis and evolution
 
 ### Best Practices 💪
@@ -204,8 +205,9 @@ memory_system.delete(memory_id3)
 
 4. **LLM Integration** 🤖:
    - Ensure API keys are properly configured for your chosen backend
-   - Use gpt-4o-mini for cost-effective analysis or gpt-4 for higher quality
-   - Consider Ollama for local deployment and privacy requirements
+   - OpenAI: Use gpt-4o-mini for cost-effective analysis or gpt-4 for higher quality
+   - OpenRouter: Try free models as well as premium models from a vast catalog
+   - Ollama: Consider for local deployment and privacy requirements
    - Monitor LLM usage for cost management
 
 5. **Error Handling** ⚠️:
