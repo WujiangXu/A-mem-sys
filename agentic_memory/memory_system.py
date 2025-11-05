@@ -90,20 +90,24 @@ class AgenticMemorySystem:
     - Hybrid search capabilities
     """
     
-    def __init__(self, 
+    def __init__(self,
                  model_name: str = 'all-MiniLM-L6-v2',
                  llm_backend: str = "openai",
                  llm_model: str = "gpt-4o-mini",
                  evo_threshold: int = 100,
-                 api_key: Optional[str] = None):  
+                 api_key: Optional[str] = None,
+                 sglang_host: str = "http://localhost",
+                 sglang_port: int = 30000):
         """Initialize the memory system.
-        
+
         Args:
             model_name: Name of the sentence transformer model
-            llm_backend: LLM backend to use (openai/ollama)
+            llm_backend: LLM backend to use (openai/ollama/sglang)
             llm_model: Name of the LLM model
             evo_threshold: Number of memories before triggering evolution
             api_key: API key for the LLM service
+            sglang_host: Host URL for SGLang server (default: http://localhost)
+            sglang_port: Port for SGLang server (default: 30000)
         """
         self.memories = {}
         self.model_name = model_name
@@ -114,12 +118,12 @@ class AgenticMemorySystem:
             temp_retriever.client.reset()
         except Exception as e:
             logger.warning(f"Could not reset ChromaDB collection: {e}")
-            
+
         # Create a fresh retriever instance
         self.retriever = ChromaRetriever(collection_name="memories",model_name=self.model_name)
-        
+
         # Initialize LLM controller
-        self.llm_controller = LLMController(llm_backend, llm_model, api_key)
+        self.llm_controller = LLMController(llm_backend, llm_model, api_key, sglang_host, sglang_port)
         self.evo_cnt = 0
         self.evo_threshold = evo_threshold
 

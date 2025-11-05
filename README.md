@@ -82,11 +82,27 @@ Here's how to use the Agentic Memory system for basic operations:
 ```python
 from agentic_memory.memory_system import AgenticMemorySystem
 
-# Initialize the memory system 🚀
+# Initialize the memory system with OpenAI 🚀
 memory_system = AgenticMemorySystem(
     model_name='all-MiniLM-L6-v2',  # Embedding model for ChromaDB
-    llm_backend="openai",           # LLM backend (openai/ollama)
+    llm_backend="openai",           # LLM backend (openai/ollama/sglang)
     llm_model="gpt-4o-mini"         # LLM model name
+)
+
+# OR initialize with SGLang for faster local inference 🚀
+memory_system = AgenticMemorySystem(
+    model_name='all-MiniLM-L6-v2',
+    llm_backend="sglang",           # Use SGLang backend
+    llm_model="meta-llama/Llama-3.1-8B-Instruct",  # Your local model
+    sglang_host="http://localhost", # SGLang server host
+    sglang_port=30000               # SGLang server port
+)
+
+# OR initialize with Ollama 🚀
+memory_system = AgenticMemorySystem(
+    model_name='all-MiniLM-L6-v2',
+    llm_backend="ollama",
+    llm_model="llama2"
 )
 
 # Add Memories with Automatic LLM Analysis ✨
@@ -178,9 +194,37 @@ memory_system.delete(memory_id3)
    - Timestamp tracking and retrieval count monitoring
 
 5. **Multiple LLM Backends** 🤖
-   - OpenAI (GPT-4, GPT-4o-mini, GPT-3.5)
-   - Ollama (for local deployment)
+   - **OpenAI** (GPT-4, GPT-4o-mini, GPT-3.5) - Cloud-based, high quality
+   - **Ollama** - Local deployment for privacy
+   - **SGLang** - Fast local inference with RadixAttention for efficient KV cache reuse
    - Configurable model selection for analysis and evolution
+
+#### Setting up SGLang Backend
+
+SGLang provides ultra-fast local inference. To use it:
+
+1. Install SGLang:
+```bash
+pip install "sglang[all]"
+```
+
+2. Launch SGLang server:
+```bash
+python -m sglang.launch_server \
+    --model-path meta-llama/Llama-3.1-8B-Instruct \
+    --host 0.0.0.0 \
+    --port 30000
+```
+
+3. Use in your code:
+```python
+memory_system = AgenticMemorySystem(
+    llm_backend="sglang",
+    llm_model="meta-llama/Llama-3.1-8B-Instruct",
+    sglang_host="http://localhost",
+    sglang_port=30000
+)
+```
 
 ### Best Practices 💪
 
