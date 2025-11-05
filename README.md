@@ -85,7 +85,7 @@ from agentic_memory.memory_system import AgenticMemorySystem
 # Initialize the memory system with OpenAI 🚀
 memory_system = AgenticMemorySystem(
     model_name='all-MiniLM-L6-v2',  # Embedding model for ChromaDB
-    llm_backend="openai",           # LLM backend (openai/ollama/sglang)
+    llm_backend="openai",           # LLM backend (openai/ollama/sglang/openrouter)
     llm_model="gpt-4o-mini"         # LLM model name
 )
 
@@ -96,6 +96,14 @@ memory_system = AgenticMemorySystem(
     llm_model="meta-llama/Llama-3.1-8B-Instruct",  # Your local model
     sglang_host="http://localhost", # SGLang server host
     sglang_port=30000               # SGLang server port
+)
+
+# OR initialize with OpenRouter for multi-provider access 🚀
+memory_system = AgenticMemorySystem(
+    model_name='all-MiniLM-L6-v2',
+    llm_backend="openrouter",       # Use OpenRouter backend
+    llm_model="openai/gpt-4o-mini", # OpenRouter model identifier
+    api_key="your-openrouter-key"   # Or set OPENROUTER_API_KEY env variable
 )
 
 # OR initialize with Ollama 🚀
@@ -173,7 +181,7 @@ memory_system.delete(memory_id3)
    - Automatic keyword extraction from content
    - Context generation based on semantic understanding
    - Smart tag assignment for categorization
-   - Seamless integration with OpenAI and Ollama backends
+   - Seamless integration with OpenAI, Ollama, and OpenRouter backends
 
 2. **Enhanced ChromaDB Vector Storage** 📦
    - Embedding generation using content + metadata for superior semantic search
@@ -197,6 +205,7 @@ memory_system.delete(memory_id3)
    - **OpenAI** (GPT-4, GPT-4o-mini, GPT-3.5) - Cloud-based, high quality
    - **Ollama** - Local deployment for privacy
    - **SGLang** - Fast local inference with RadixAttention for efficient KV cache reuse
+   - **OpenRouter** - Access to 100+ models from multiple providers through unified API
    - Configurable model selection for analysis and evolution
 
 #### Setting up SGLang Backend
@@ -226,6 +235,28 @@ memory_system = AgenticMemorySystem(
 )
 ```
 
+#### Setting up OpenRouter Backend
+
+OpenRouter provides access to 100+ models from multiple providers. To use it:
+
+1. Get an API key from [OpenRouter](https://openrouter.ai/)
+
+2. Set the environment variable:
+```bash
+export OPENROUTER_API_KEY="your-key-here"
+```
+
+3. Use in your code:
+```python
+memory_system = AgenticMemorySystem(
+    llm_backend="openrouter",
+    llm_model="openai/gpt-4o-mini",  # or "anthropic/claude-3.5-sonnet", etc.
+    api_key="your-key"  # Optional if OPENROUTER_API_KEY is set
+)
+```
+
+Available models: `openai/gpt-4o-mini`, `anthropic/claude-3.5-sonnet`, `google/gemini-2.0-flash-001:free`, and many more!
+
 ### Best Practices 💪
 
 1. **Memory Creation** ✨:
@@ -248,8 +279,9 @@ memory_system = AgenticMemorySystem(
 
 4. **LLM Integration** 🤖:
    - Ensure API keys are properly configured for your chosen backend
-   - Use gpt-4o-mini for cost-effective analysis or gpt-4 for higher quality
-   - Consider Ollama for local deployment and privacy requirements
+   - OpenAI: Use gpt-4o-mini for cost-effective analysis or gpt-4 for higher quality
+   - OpenRouter: Try free models as well as premium models from a vast catalog
+   - Ollama: Consider for local deployment and privacy requirements
    - Monitor LLM usage for cost management
 
 5. **Error Handling** ⚠️:
