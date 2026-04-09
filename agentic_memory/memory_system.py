@@ -97,33 +97,64 @@ class AgenticMemorySystem:
                  evo_threshold: int = 100,
                  api_key: Optional[str] = None,
                  sglang_host: str = "http://localhost",
-                 sglang_port: int = 30000):
+                 sglang_port: int = 30000,
+                 azure_endpoint: Optional[str] = None,
+                 api_version: Optional[str] = None,
+                 embedding_provider: str = "sentence_transformer",
+                 azure_embedding_model: str = "text-embedding-3-small",
+                 azure_embedding_api_key: Optional[str] = None,
+                 azure_embedding_endpoint: Optional[str] = None,
+                 azure_embedding_api_version: Optional[str] = None):
         """Initialize the memory system.
 
         Args:
             model_name: Name of the sentence transformer model
-            llm_backend: LLM backend to use (openai/ollama/sglang)
-            llm_model: Name of the LLM model
+            llm_backend: LLM backend to use (openai/azure_openai/ollama/sglang/openrouter)
+            llm_model: Name of the LLM model or Azure deployment name
             evo_threshold: Number of memories before triggering evolution
             api_key: API key for the LLM service
             sglang_host: Host URL for SGLang server (default: http://localhost)
             sglang_port: Port for SGLang server (default: 30000)
+            azure_endpoint: Azure OpenAI endpoint URL (required for azure_openai LLM backend)
+            api_version: Azure OpenAI API version (required for azure_openai LLM backend)
+            embedding_provider: Embedding backend - "sentence_transformer" or "azure_openai".
+            azure_embedding_model: Azure OpenAI embedding deployment name (e.g. "text-embedding-3-small").
+            azure_embedding_api_key: API key for Azure OpenAI embeddings (falls back to AZURE_OPENAI_API_KEY).
+            azure_embedding_endpoint: Endpoint for Azure OpenAI embeddings (falls back to AZURE_OPENAI_ENDPOINT).
+            azure_embedding_api_version: API version for Azure OpenAI embeddings.
         """
         self.memories = {}
         self.model_name = model_name
+        self._embedding_kwargs = dict(
+            embedding_provider=embedding_provider,
+            azure_embedding_model=azure_embedding_model,
+            azure_api_key=azure_embedding_api_key,
+            azure_endpoint=azure_embedding_endpoint,
+            azure_api_version=azure_embedding_api_version,
+        )
         # Initialize ChromaDB retriever with empty collection
         try:
-            # First try to reset the collection if it exists
-            temp_retriever = ChromaRetriever(collection_name="memories",model_name=self.model_name)
-            temp_retriever.client.reset()
+            # # First try to reset the collection if it exists
+            # temp_retriever = ChromaRetriever(collection_name="memories", model_name=self.model_name,
+            #                                  **self._embedding_kwargs)
+            # temp_retriever.client.reset()
+
+        # Reset in-memory ChromaDB so a fresh collection is created with the correct embedding function.
+        # Must reset via a bare client BEFORE constructing ChromaRetriever to avoid embedding-function conflicts.
+            import chromadb as _chromadb
+            from chromadb.config import Settings as _Settings
+            _chromadb.Client(_Settings(allow_reset=True)).reset()
+
         except Exception as e:
             logger.warning(f"Could not reset ChromaDB collection: {e}")
 
         # Create a fresh retriever instance
-        self.retriever = ChromaRetriever(collection_name="memories",model_name=self.model_name)
+        self.retriever = ChromaRetriever(collection_name="memories", model_name=self.model_name,
+                                         **self._embedding_kwargs)
 
         # Initialize LLM controller
-        self.llm_controller = LLMController(llm_backend, llm_model, api_key, sglang_host, sglang_port)
+        self.llm_controller = LLMController(llm_backend, llm_model, api_key, sglang_host, sglang_port,
+                                            azure_endpoint, api_version)
         self.evo_cnt = 0
         self.evo_threshold = evo_threshold
 
@@ -292,7 +323,8 @@ class AgenticMemorySystem:
     def consolidate_memories(self):
         """Consolidate memories: update retriever with new documents"""
         # Reset ChromaDB collection
-        self.retriever = ChromaRetriever(collection_name="memories",model_name=self.model_name)
+        self.retriever = ChromaRetriever(collection_name="memories", model_name=self.model_name,
+                                         **self._embedding_kwargs)
         
         # Re-add all memory documents with their complete metadata
         for memory in self.memories.values():

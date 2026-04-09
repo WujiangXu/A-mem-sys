@@ -77,6 +77,65 @@ class OpenAIController(BaseLLMController):
         response = self.client.chat.completions.create(**kwargs)
         return response.choices[0].message.content
 
+class AzureOpenAIController(BaseLLMController):
+    """LLM controller for Azure OpenAI Service.
+
+    Args:
+        model: Azure deployment name (e.g., "gpt-4o-mini").
+        api_key: Azure OpenAI API key. If None, reads from AZURE_OPENAI_API_KEY env variable.
+        azure_endpoint: Azure OpenAI endpoint URL (e.g., "https://your-resource.openai.azure.com/").
+                        If None, reads from AZURE_OPENAI_ENDPOINT env variable.
+        api_version: Azure OpenAI API version (e.g., "2024-02-15-preview").
+                     If None, reads from AZURE_OPENAI_API_VERSION env variable.
+
+    Raises:
+        ImportError: If the openai package is not installed.
+        ValueError: If required credentials are missing.
+    """
+
+    def __init__(self,
+                 model: str = "gpt-4o-mini",
+                 api_key: Optional[str] = None,
+                 azure_endpoint: Optional[str] = None,
+                 api_version: Optional[str] = None):
+        try:
+            from openai import AzureOpenAI
+            self.model = model
+
+            api_key = api_key or os.getenv("AZURE_OPENAI_API_KEY")
+            azure_endpoint = azure_endpoint or os.getenv("AZURE_OPENAI_ENDPOINT")
+            api_version = api_version or os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview")
+
+            if not api_key:
+                raise ValueError("Azure OpenAI API key not found. Set AZURE_OPENAI_API_KEY environment variable.")
+            if not azure_endpoint:
+                raise ValueError("Azure OpenAI endpoint not found. Set AZURE_OPENAI_ENDPOINT environment variable.")
+
+            self.client = AzureOpenAI(
+                api_key=api_key,
+                azure_endpoint=azure_endpoint,
+                api_version=api_version,
+            )
+        except ImportError:
+            raise ImportError("OpenAI package not found. Install it with: pip install openai")
+
+    def get_completion(self, prompt: str, response_format: dict, temperature: float = 1.0, max_tokens: int = None) -> str:
+        kwargs = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": "You must respond with a JSON object."},
+                {"role": "user", "content": prompt},
+            ],
+            "response_format": response_format,
+            "temperature": temperature,
+        }
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+
+        response = self.client.chat.completions.create(**kwargs)
+        return response.choices[0].message.content
+
+
 class OllamaController(BaseLLMController):
     def __init__(self, model: str = "llama2"):
         from ollama import chat
@@ -214,16 +273,20 @@ class OpenRouterController(BaseLLMController):
 class LLMController:
     """LLM-based controller for memory metadata generation.
 
-    Supports multiple backends: OpenAI, Ollama, SGLang, and OpenRouter.
+    Supports multiple backends: OpenAI, AzureOpenAI, Ollama, SGLang, and OpenRouter.
     """
     def __init__(self,
-                 backend: Literal["openai", "ollama", "sglang", "openrouter"] = "openai",
+                 backend: Literal["openai", "azure_openai", "ollama", "sglang", "openrouter"] = "openai",
                  model: str = "gpt-4",
                  api_key: Optional[str] = None,
                  sglang_host: str = "http://localhost",
-                 sglang_port: int = 30000):
+                 sglang_port: int = 30000,
+                 azure_endpoint: Optional[str] = None,
+                 api_version: Optional[str] = None):
         if backend == "openai":
             self.llm = OpenAIController(model, api_key)
+        elif backend == "azure_openai":
+            self.llm = AzureOpenAIController(model, api_key, azure_endpoint, api_version)
         elif backend == "ollama":
             self.llm = OllamaController(model)
         elif backend == "sglang":
@@ -231,7 +294,7 @@ class LLMController:
         elif backend == "openrouter":
             self.llm = OpenRouterController(model, api_key)
         else:
-            raise ValueError("Backend must be one of: 'openai', 'ollama', 'sglang', 'openrouter'")
+            raise ValueError("Backend must be one of: 'openai', 'azure_openai', 'ollama', 'sglang', 'openrouter'")
 
     def get_completion(self, prompt: str, response_format: dict = None, temperature: float = 1.0) -> str:
         return self.llm.get_completion(prompt, response_format, temperature)

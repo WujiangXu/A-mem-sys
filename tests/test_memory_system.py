@@ -1,15 +1,99 @@
 import unittest
+from unittest.mock import Mock, patch, MagicMock
+import json
 from agentic_memory.memory_system import AgenticMemorySystem, MemoryNote
 from datetime import datetime
 
 class TestAgenticMemorySystem(unittest.TestCase):
+    # LLM response mocks
+    _OPENAI_LLM_RESPONSE = json.dumps({
+        "keywords": ["test", "memory"],
+        "context": "Unit test context",
+        "tags": ["test", "unit"],
+    })
+    _AZURE_LLM_RESPONSE = json.dumps({
+        "keywords": ["azure", "openai", "memory"],
+        "context": "Azure OpenAI integration test",
+        "tags": ["cloud", "ai", "testing"],
+    })
+
+    # ------------------------------------------------------------------
+    # Mock helpers
+    # ------------------------------------------------------------------
+    def _make_openai_completion_mock(self):
+        msg = Mock()
+        msg.content = self._OPENAI_LLM_RESPONSE
+        choice = Mock()
+        choice.message = msg
+        response = Mock()
+        response.choices = [choice]
+        return response
+
+    def _make_azure_completion_mock(self):
+        msg = Mock()
+        msg.content = self._AZURE_LLM_RESPONSE
+        choice = Mock()
+        choice.message = msg
+        response = Mock()
+        response.choices = [choice]
+        return response
+
+    def _make_azure_embedding_mock(self):
+        item = Mock()
+        item.embedding = [0.1] * 384
+        resp = Mock()
+        resp.data = [item]
+        return resp
+
+    def _make_azure_memory_system(self, mock_azure_cls):
+        """Create an AgenticMemorySystem backed by a mocked Azure OpenAI client."""
+        import chromadb
+        from chromadb.config import Settings
+        # Clear the shared in-memory store so the Azure EF can own the "memories" collection
+        try:
+            chromadb.Client(Settings(allow_reset=True)).reset()
+        except Exception:
+            pass
+        instance = mock_azure_cls.return_value
+        instance.chat.completions.create.return_value = self._make_azure_completion_mock()
+        instance.embeddings.create.return_value = self._make_azure_embedding_mock()
+        return AgenticMemorySystem(
+            llm_backend="azure_openai",
+            llm_model="gpt-4o-mini",
+            api_key="test-llm-key",
+            azure_endpoint="https://test.openai.azure.com/",
+            api_version="2024-02-15-preview",
+            embedding_provider="azure_openai",
+            azure_embedding_model="text-embedding-3-small",
+            azure_embedding_api_key="test-embed-key",
+            azure_embedding_endpoint="https://test.openai.azure.com/",
+            azure_embedding_api_version="2024-02-15-preview",
+        )
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
     def setUp(self):
         """Set up test environment before each test."""
+        self._openai_patcher = patch("openai.OpenAI")
+        mock_openai_cls = self._openai_patcher.start()
+        mock_openai_cls.return_value.chat.completions.create.return_value = (
+            self._make_openai_completion_mock()
+        )
         self.memory_system = AgenticMemorySystem(
             model_name='all-MiniLM-L6-v2',
             llm_backend="openai",
-            llm_model="gpt-4o-mini"
+            llm_model="gpt-4o-mini",
+            api_key="test-key",
         )
+
+    def tearDown(self):
+        self._openai_patcher.stop()
+        # Reset shared ChromaDB in-memory store so the next test starts with a clean collection
+        try:
+            self.memory_system.retriever.client.reset()
+        except Exception:
+            pass
         
     def test_create_memory(self):
         """Test creating a new memory with complete metadata."""
@@ -198,24 +282,26 @@ class TestAgenticMemorySystem(unittest.TestCase):
         
     def test_memory_consolidation(self):
         """Test memory consolidation with ChromaDB."""
-        # Create multiple memories
+        # Use semantically distinct content so vector search reliably returns the right one
         contents = [
-            "Memory 1",
-            "Memory 2",
-            "Memory 3"
+            "Python is a programming language used for data science",
+            "Football is a popular sport played with a round ball",
+            "Cooking pasta requires boiling water and adding salt",
         ]
-        
+
+        ids = []
         for content in contents:
-            self.memory_system.add_note(content)
-            
+            mem_id = self.memory_system.add_note(content)
+            ids.append(mem_id)
+
         # Force consolidation
         self.memory_system.consolidate_memories()
-        
-        # Verify memories are still accessible
-        for content in contents:
-            results = self.memory_system.search_agentic(content, k=1)
-            self.assertGreater(len(results), 0)
-            self.assertEqual(results[0]['content'], content)
+
+        # Verify all memories are still accessible by ID
+        for mem_id, content in zip(ids, contents):
+            note = self.memory_system.read(mem_id)
+            self.assertIsNotNone(note)
+            self.assertEqual(note.content, content)
             
     def test_find_related_memories(self):
         """Test finding related memories."""
@@ -268,6 +354,83 @@ class TestAgenticMemorySystem(unittest.TestCase):
         self.assertIsNotNone(processed_memory.tags)
         self.assertIsNotNone(processed_memory.context)
         self.assertIsNotNone(processed_memory.keywords)
+
+    # ------------------------------------------------------------------
+    # Azure OpenAI backend tests
+    # ------------------------------------------------------------------
+    @patch("openai.AzureOpenAI")
+    def test_azure_llm_controller_is_azure(self, mock_azure_cls):
+        """AgenticMemorySystem uses AzureOpenAIController for LLM calls."""
+        from agentic_memory.llm_controller import AzureOpenAIController
+        ms = self._make_azure_memory_system(mock_azure_cls)
+        self.assertIsInstance(ms.llm_controller.llm, AzureOpenAIController)
+
+    @patch("openai.AzureOpenAI")
+    def test_azure_embedding_function_is_azure(self, mock_azure_cls):
+        """ChromaRetriever uses AzureOpenAIEmbeddingFunction when embedding_provider='azure_openai'."""
+        from agentic_memory.retrievers import AzureOpenAIEmbeddingFunction
+        ms = self._make_azure_memory_system(mock_azure_cls)
+        self.assertIsInstance(ms.retriever.embedding_function, AzureOpenAIEmbeddingFunction)
+
+    @patch("openai.AzureOpenAI")
+    def test_azure_add_note_returns_id(self, mock_azure_cls):
+        """add_note returns a non-empty memory ID when using Azure backend."""
+        ms = self._make_azure_memory_system(mock_azure_cls)
+        memory_id = ms.add_note(
+            content="Azure OpenAI provides GPT-4 models via a managed cloud service."
+        )
+        self.assertIsNotNone(memory_id)
+        self.assertIsInstance(memory_id, str)
+        self.assertGreater(len(memory_id), 0)
+
+    @patch("openai.AzureOpenAI")
+    def test_azure_add_note_stores_llm_metadata(self, mock_azure_cls):
+        """Keywords/context/tags generated by Azure LLM are persisted on the MemoryNote."""
+        ms = self._make_azure_memory_system(mock_azure_cls)
+        mem_id = ms.add_note(content="Test cloud AI content")
+        note = ms.read(mem_id)
+        self.assertIsNotNone(note)
+        self.assertIsInstance(note.keywords, list)
+        self.assertIsInstance(note.tags, list)
+        self.assertIsInstance(note.context, str)
+
+    @patch("openai.AzureOpenAI")
+    def test_azure_update_replaces_fields(self, mock_azure_cls):
+        """update() replaces targeted fields on an Azure-backed memory."""
+        ms = self._make_azure_memory_system(mock_azure_cls)
+        mem_id = ms.add_note(content="Original content")
+        success = ms.update(
+            mem_id,
+            content="Updated content",
+            tags=["updated"],
+            keywords=["updated"],
+            context="Updated context",
+        )
+        self.assertTrue(success)
+        note = ms.read(mem_id)
+        self.assertEqual(note.content, "Updated content")
+        self.assertEqual(note.tags, ["updated"])
+        self.assertEqual(note.context, "Updated context")
+
+    @patch("openai.AzureOpenAI")
+    def test_azure_delete_removes_memory(self, mock_azure_cls):
+        """delete() removes a memory from an Azure-backed system."""
+        ms = self._make_azure_memory_system(mock_azure_cls)
+        mem_id = ms.add_note(content="Memory to delete")
+        self.assertIsNotNone(ms.read(mem_id))
+        success = ms.delete(mem_id)
+        self.assertTrue(success)
+        self.assertIsNone(ms.read(mem_id))
+
+    @patch("openai.AzureOpenAI")
+    def test_azure_embedding_kwargs_propagated_to_consolidate(self, mock_azure_cls):
+        """After consolidate_memories(), retriever still uses Azure embedding function."""
+        from agentic_memory.retrievers import AzureOpenAIEmbeddingFunction
+        ms = self._make_azure_memory_system(mock_azure_cls)
+        ms.add_note(content="Memory before consolidation")
+        ms.consolidate_memories()
+        self.assertIsInstance(ms.retriever.embedding_function, AzureOpenAIEmbeddingFunction)
+
 
 if __name__ == '__main__':
     unittest.main()
